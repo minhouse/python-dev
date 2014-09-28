@@ -2,7 +2,6 @@
  
 import paramiko
 
-
 USER = 'root'
 PSWD = 'minh01227'
 
