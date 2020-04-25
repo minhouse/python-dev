@@ -1,22 +1,4 @@
 #!/usr/bin/python
-#===============================================================================
-#
-#          FILE: logsearch_v1.py
-#
-#         USAGE: ---
-#
-#   DESCRIPTION: This Python script is to search for a specific word from multiple log files.
-#                Calculate occurrence of searched word.
-# TARGET SYSTEM: System with Python ver3.x installed.
-#       OPTIONS: ---
-#  REQUIREMENTS: ---
-#          BUGS: ---
-#         NOTES: ---
-#        AUTHOR: Minho Tokuhara
-#  ORGANIZATION: Landis+Gyr Japan
-#       CREATED: 2015/08/25
-#      REVISION: Minor code change and bug fix will be needed.
-#===============================================================================
 
 import sys
 import os
