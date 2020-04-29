@@ -1,24 +1,6 @@
 #!/usr/bin/python
 # coding:utf-8
 
-#===============================================================================
-#
-#          FILE: webconfig_xlsxwrite_script_ver5-1.py
-#
-#         USAGE: ---
-#
-#   DESCRIPTION: This Python script is to extract <behaviors>, <bindings>, <appSettings> tags from web.config into Excel
-# TARGET SYSTEM: System with Python ver3.x installed.
-#       OPTIONS: ---
-#  REQUIREMENTS: ---
-#          BUGS: ---
-#         NOTES: ---
-#       CREATOR: Minho Tokuhara
-#  ORGANIZATION: Landis+Gyr Japan
-#       CREATED: 2015/07/13 ‏‎
-#      REVISION: Code-Refactoring and minor change will be needed.
-#===============================================================================
-
 #Importing Modules
 import os
 import datetime
