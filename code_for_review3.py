@@ -41,6 +41,8 @@ Config_Meter = cr_list[cr_list['meter_status'] == 'Configure']
 Failed_Meter = cr_list[cr_list['meter_status'] == 'Failed']
 Lost_Meter = cr_list[cr_list['meter_status'] == 'Lost']
 
+#target_date = cr_list.iloc[0,7].strftime('%Y-%m-%d')
+
 Total_AllMeter_Count = cr_list['meterno'].count()
 Total_HighRiseMeter_Count = cr_highrise['meterno'].count()
 Total_VillageMeter_Count = cr_village['meterno'].count()
@@ -65,13 +67,6 @@ hexed_serial = hexed_serial.rename(columns={'serialnumber':'hex_serial'})
 hexed_serial = hexed_serial['hex_serial'].apply(lambda x:format(x, 'x'))
 No_reading_meter = pd.concat([No_reading_meter, hexed_serial], axis=1)
 No_reading_meter = No_reading_meter.reset_index(drop=True)
-
-#FW version performance
-fw_avg = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.mean})
-fw_std = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.std})
-fw_perf = pd.concat([fw_avg, fw_std], axis=1, join_axes=[fw_avg.index])
-fw_perf.columns = ['LP Average', 'LP Std Deviation']
-fw_perf = fw_perf.round()
 
 class District:
     def __init__(self, cr_list, attr):
@@ -563,7 +558,6 @@ class AllDayendPushCountPerformance:
         'Missing DayEnd Reading LDA Meter Count':self.Missing_DayEnd_Reading_LDAMeter_Count
         })
 
-
 class MeterTypeCompositionRate:
     def __init__(self, Total_AllMeter_Count, Normal_Meter_Count, SecConfig_Meter_Count, Config_Meter_Count, Discovered_Meter_Count, Failed_Meter_Count, Lost_Meter_Count, Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unlocated_meter_Count, Total_LDAMeter_Count, Total_CellMeter_Count):
         #MeterType Composition Rate
@@ -598,6 +592,61 @@ class MeterTypeCompositionRate:
         'Lost Status Meter(%)':round(self.Lost_Meter_Rate,3)
         })
 
+class CollectorPerformance(District):
+    def __init__(self, district_meter):
+        self.name = district_meter
+        self.cr_perf = self.name[self.name['name'].str.startswith('98020', na=False)]
+        self.cr_perf_avg = self.cr_perf.groupby(['name'])['NoOfIntervals'].mean()
+        self.cr_perf_std = self.cr_perf.groupby(['name'])['NoOfIntervals'].std()
+        self.cr_perf = pd.concat([self.cr_perf_avg, self.cr_perf_std], axis=1, join_axes=[self.cr_perf_avg.index])
+        self.cr_perf = self.cr_perf.round()
+        self.cr_perf.columns = ['Average LP Count','Std LP Count']
+
+    def get_collector_statistics(self):
+        print(self.cr_perf)
+'''
+class WriteToExcel(CollectorPerformance):
+    def __init__(self,df_performance, cr_list, CR_perf, CC_CR_Rnk, CR_perf_district_b, TO_CR_Rnk, CR_perf_district_c, TM_CR_Rnk, CR_perf_district_d, TC_CR_Rnk, Latest_Meters, fw_perf, region_perf, area_perf, target_date, today_date):
+        self.dir = 'C:/Users/Desktop/RF_Analysis/SSR/'
+        self.writer = pd.ExcelWriter('%sReading_Performance_Report%s_%s.xlsx' % (self.dir, target_date, today_date))
+
+    def write_to_excel(self):
+        df_performance.to_excel(self.writer, "Performance Report")
+        cr_list.to_excel(self.writer,"Analyzed Individual Meters", index=False)
+        CR_perf.to_excel(self.writer,"CR Performance")
+        CR_perf_district.to_excel(self.writer,"{} CR Performance")
+        CC_CR_Rnk.to_excel(self.writer,"{} CR ABC Rank")
+        CR_perf_district_b.to_excel(self.writer,"District B CR Performance")
+        TO_CR_Rnk.to_excel(self.writer,"District B CR ABC Rank")
+        CR_perf_district_c.to_excel(self.writer,"District C CR Performance")
+        TM_CR_Rnk.to_excel(self.writer,"District C CR ABC Rank")
+        CR_perf_district_d.to_excel(self.writer,"District D CR Performance")
+        TC_CR_Rnk.to_excel(self.writer,"District D CR ABC Rank")
+        Latest_Meters.to_excel(self.writer, "LatestMeters")
+        fw_perf.to_excel(self.writer, "FW Performance")
+        region_perf.to_excel(self.writer, "Region Performance")
+        area_perf.to_excel(self.writer, "Area Performance")
+
+        workbook  = self.writer.book
+        worksheet = self.writer.sheets['Performance Report']
+        cell_format = workbook.add_format()
+        cell_format.set_align('right')
+        worksheet.set_column(0,0,68, cell_format)
+        worksheet.set_column(1,10,17)
+        worksheet = self.writer.sheets['Region Performance']
+        worksheet.set_column(0,0,27)
+        self.writer.save()
+'''
+
+class FirmwarePerformance():
+    def __init__(self, cr_list):
+        #FW version performance
+        self.fw_avg = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.mean})
+        self.fw_std = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.std})
+        self.fw_perf = pd.concat([self.fw_avg, self.fw_std], axis=1, join_axes=[self.fw_avg.index])
+        self.fw_perf.columns = ['LP Average', 'LP Std Deviation']
+        self.fw_perf = self.fw_perf.round()
+
 def main():
     district_list = list(
     [District(cr_list, 'district_a'),
@@ -606,40 +655,42 @@ def main():
     District(cr_list, 'district_d')])
 
     for district in district_list:
-        print(district.get_dict())
+        #print(district.get_dict())
+        all_region = CollectorPerformance(district)
+        print(all_region.get_collector_statistics())
 
     kpimetercount = KeyPerformanceIndicator(Total_AllMeter_Count, Total_LDAMeter_Count, onlycell_meter, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_CellMeter_Count, cr_list)
-    print(kpimetercount.get_dict_kpi())
-
     slametercount = SLAPerformance(cr_list)
-    print(slametercount.get_dict_sla())
-
     latestmetercount = LatestMeterPerformance(cr_list)
-    print(latestmetercount.get_dict_latest())
-
     allmetermetercount = AllMetersCount()
-    print(allmetermetercount.get_dict_allmetercount(Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, unlocated_meter_Count))
-
     allllpintervalpushsuccessrate = AllLPIntervalPushSuccessRate(Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, cr_highrise, cr_village, onlycell_meter, LDA_meter)
-    print(allllpintervalpushsuccessrate.get_dict_alllpintervalpushsuccessrate())
-
     allldayendpushsuccessrate = AllDayendPushSuccessRate(Total_HighRiseMeter_Count, cr_highrise, Total_VillageMeter_Count, cr_village, Total_CellMeter_Count, Total_LDAMeter_Count, onlycell_meter, LDA_meter)
-    print(allldayendpushsuccessrate.get_dict_alldayendpushsuccessrate())
-
     nolppushmetersummary = NoLpPushMeterSummary(Total_AllMeter_Count, cr_list)
-    print(nolppushmetersummary.get_dict_allnolppushmetersummary())
-
     metersstatuscount = MeterStatusCount(cr_list)
-    print(metersstatuscount.get_dict_meterstatuscount())
-
     alllppushcountperformance = AllLpPushCountPerformance(cr_list, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_LDAMeter_Count, cr_highrise, cr_village, Total_CellMeter_Count, onlycell_meter, LDA_meter)
-    print(alllppushcountperformance.get_dict_alllppushcountperformance())
-
     alldayendpushcountperformance = AllDayendPushCountPerformance(cr_list, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_LDAMeter_Count, cr_highrise, cr_village, Total_CellMeter_Count, onlycell_meter, LDA_meter)
-    print(alldayendpushcountperformance.get_dict_alldayendpushcountperformance())
-
     metercompositionrate = MeterTypeCompositionRate(Total_AllMeter_Count, Normal_Meter_Count, SecConfig_Meter_Count, Config_Meter_Count, Discovered_Meter_Count, Failed_Meter_Count, Lost_Meter_Count, Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unlocated_meter_Count, Total_LDAMeter_Count, Total_CellMeter_Count)
-    print(metercompositionrate.get_dict_metertypecompositionrate())
+
+    new_dict = collections.OrderedDict(
+        **kpimetercount.get_dict_kpi(),
+        **slametercount.get_dict_sla(),
+        **latestmetercount.get_dict_latest(),
+        **allmetermetercount.get_dict_allmetercount(Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, unlocated_meter_Count),
+        **allllpintervalpushsuccessrate.get_dict_alllpintervalpushsuccessrate(),
+        **allldayendpushsuccessrate.get_dict_alldayendpushsuccessrate(),
+        **nolppushmetersummary.get_dict_allnolppushmetersummary(),
+        **metersstatuscount.get_dict_meterstatuscount(),
+        **alllppushcountperformance.get_dict_alllppushcountperformance(),
+        **alldayendpushcountperformance.get_dict_alldayendpushcountperformance(),
+        **metercompositionrate.get_dict_metertypecompositionrate()
+    )
+
+    df_performance = pd.DataFrame(pd.io.json.json_normalize(new_dict).T)
+    df_performance.columns = ['Performance Result']
+    #print(df_performance)
+
+    #writetoexcel = WriteToExcel(df_performance, cr_list, CR_perf, CC_CR_Rnk, CR_perf_district_b, TO_CR_Rnk, CR_perf_district_c, TM_CR_Rnk, CR_perf_district_d, TC_CR_Rnk, Latest_Meters, fw_perf, region_perf, area_perf, target_date, today_date)
+    #writetoexcel.write_to_excel()
 
 if __name__ == '__main__':
     main()
