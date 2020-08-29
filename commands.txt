@@ -1,0 +1,2 @@
+cat /opt/profile/config.ini
+ls /opt/profile/
