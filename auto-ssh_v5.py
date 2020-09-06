@@ -36,25 +36,16 @@ class CommandExecuter():
 
     def execute(self):
         try:
-            with suppress(Exception):
-                with closing(paramiko.SSHClient()) as ssh:
-                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    ssh.connect(self.host, username=self.user, password=self.pswd)
-                    stdin, stdout, stderr = ssh.exec_command(self.command)
-                    errors = stderr.readlines()
-                    lines = [v.strip() for v in stdout.readlines()]
-                    return lines
-            print('## %s SSH connection failed ##' % self.host + '\n')
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(self.host, username=self.user, password=self.pswd)
+            stdin, stdout, stderr = ssh.exec_command(self.command)
+            errors = stderr.readlines()
+            lines = [v.strip() for v in stdout.readlines()]
+            return lines
         except Exception as err:
-            logging.exception('%', err)
-
-    '''def __del__(self):
-        self.host = None
-        self.command = None
-        self.commands_path = None
-        self.hosts_path = None
-        self.exec_command = None
-        del self'''
+            print('[ERROR] %s SSH connection failed' % self.host + '\n')
+            raise err
 
 
 def main():
@@ -65,16 +56,16 @@ def main():
     reader.read()
 
     for h in reader.hosts:
-        for c in reader.commands:
-            executer = CommandExecuter(h, c, user, pswd)
-            results = executer.execute()
-            print("{0} {1}".format(h, c) + '\n')
-            if results is not None:
-                for i in results:
-                    print(i + '\n')
-        #del executer
-        #del results
-        #gc.collect()
+        try:
+            for c in reader.commands:
+                executer = CommandExecuter(h, c, user, pswd)
+                results = executer.execute()
+                print("{0} {1}".format(h, c) + '\n')
+                if results is not None:
+                    for i in results:
+                        print(i + '\n')
+        except Exception as err:
+            logging.exception('%', err)
 
 
 # Main Procedure
