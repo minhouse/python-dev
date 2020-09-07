@@ -40,12 +40,15 @@ class CommandExecuter():
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(self.host, username=self.user, password=self.pswd)
             stdin, stdout, stderr = ssh.exec_command(self.command)
-            errors = stderr.readlines()
             lines = [v.strip() for v in stdout.readlines()]
+            ssh.close()
             return lines
         except Exception as err:
             print('[ERROR] %s SSH connection failed' % self.host + '\n')
             raise err
+        finally:
+            if ssh:
+                ssh.close()
 
 
 def main():
@@ -65,7 +68,7 @@ def main():
                     for i in results:
                         print(i + '\n')
         except Exception as err:
-            logging.exception('%', err)
+            logging.exception('%s', err)
 
 
 # Main Procedure
