@@ -1,0 +1,3 @@
+[submodule "python-dev"]
+	path = python-dev
+	url = https://github.com/minhouse/python-dev.git
