@@ -40,178 +40,76 @@ fw_perf = pd.concat([fw_avg, fw_std], axis=1, join_axes=[fw_avg.index])
 fw_perf.columns = ['LP Average', 'LP Std Deviation']
 fw_perf = fw_perf.round()
 
-#district_a
-district_a_meter = cr_list[cr_list['District'].str.contains('District A', na=False)]
-district_a_meter_Count = district_a_meter['meterno'].count()
-district_a_meter_Full_48_LP_Interval = district_a_meter[district_a_meter['NoOfIntervals'] == 48]
-district_a_meter_Full_48_LP_Interval_Meter_Count = district_a_meter_Full_48_LP_Interval['meterno'].count()
-district_a_meter_Full_48_LP_Interval_Meter_Rate = round((district_a_meter_Full_48_LP_Interval_Meter_Count/district_a_meter_Count)*100,2)
-district_a_1468 = district_a_meter[district_a_meter['firmwareversion'].str.contains('-14.68', na=False)]
-district_a_1468_Count = district_a_1468['meterno'].count()
-district_a_1468_Rate  = round((district_a_1468_Count/district_a_meter_Count)*100,2)
+class District:
+    def __init__(self, cr_list, attr):
+        self.name = "District {}".format(attr)
+        self.district_meter = cr_list[cr_list['District'].str.contains(self.name, na=False)]
+        self.district_meter_Count = district_meter['meterno'].count()
+        self.district_meter_Full_48_LP_Interval = district_meter[district_meter['NoOfIntervals'] == 48]
+        self.district_meter_Full_48_LP_Interval_Meter_Count = district_meter_Full_48_LP_Interval['meterno'].count()
+        self.district_meter_Full_48_LP_Interval_Meter_Rate = round((district_meter_Full_48_LP_Interval_Meter_Count/district_meter_Count)*100,2)
+        self.district_1468 = district_meter[district_meter['firmwareversion'].str.contains('-24.60', na=False)]
+        self.district_1468_Count = district_1468['meterno'].count()
+        self.district_1468_Rate = round((district_1468_Count/district_meter_Count)*100,2)
+        self.district_meter_Normal_Meter = district_meter[district_meter['meter_status'] == 'Normal']
+        self.district_meter_Normal_Meter_Count = district_meter_Normal_Meter['meterno'].count()
+        self.district_meter_SecConfig_Meter = district_meter[district_meter['meter_status'] == 'SecConfig']
+        self.district_meter_SecConfig_Meter_Count = district_meter_SecConfig_Meter['meterno'].count()
+        self.district_meter_Discovered_Meter = district_meter[district_meter['meter_status'] == 'Discovered']
+        self.district_meter_Discovered_Meter_Count = district_meter_Discovered_Meter['meterno'].count()
+        self.district_meter_Config_Meter = district_meter[district_meter['meter_status'] == 'Configure']
+        self.district_meter_Config_Meter_Count = district_meter_Config_Meter['meterno'].count()
+        self.district_meter_Failed_Meter = district_meter[district_meter['meter_status'] == 'Failed']
+        self.district_meter_Failed_Meter_Count = district_meter_Failed_Meter['meterno'].count()
+        self.district_meter_Lost_Meter = district_meter[district_meter['meter_status'] == 'Lost']
+        self.district_meter_Lost_Meter_Count = district_meter_Lost_Meter['meterno'].count()
+        #LP-DayEnd-FULL_district Meter
+        self.district_meter_LP_DayEnd_Full_Meter = district_meter[(district_meter['NoOfIntervals'] == 48) & (district_meter['DayEnd'] == 1)]
+        self.district_meter_LP_DayEnd_Full_Meter_Count = district_meter_LP_DayEnd_Full_Meter['meterno'].count()
+        self.district_meter_LP_DayEnd_Full_Meter_Rate = round((district_meter_LP_DayEnd_Full_Meter_Count/district_meter_Count)*100,2)
+        self.district_meter_Missing_DayEnd_Reading = district_meter[district_meter['DayEnd'] != 1]
+        self.district_meter_Missing_DayEnd_Reading_Meter_Count = district_meter_Missing_DayEnd_Reading['meterno'].count()
+        self.Expected_district_meter_Total_LP_Count = ((district_meter_Count)*48)
+        self.district_meter_Total_LP_Count = district_meter['NoOfIntervals'].sum()
+        self.district_meter_Total_Dayend  = district_meter[district_meter['DayEnd'] == 1]
+        self.district_meter_Total_Dayend_Count = district_meter_Total_Dayend['meterno'].count()
+        self.district_meter_LP_Success_Rate = round((district_meter_Total_LP_Count/Expected_district_meter_Total_LP_Count)*100,2)
+        self.district_meter_Dayend_Success_Rate  = round((district_meter_Total_Dayend_Count/district_meter_Count)*100,2)
+        self.district_meter_Average_LP_Interval_Push_Count = district_meter['NoOfIntervals'].mean()
+        self.district_meter_StdDev_LP_Interval_Push_Count = district_meter['NoOfIntervals'].std()
+        #abc_rank
+        self._CR_Rnk = district_meter.pivot_table(values = ['meter_status'], index = ['name'], columns = ['abc_rank'], aggfunc = 'count')
+        self._CR_Rnk.columns = _CR_Rnk.columns.droplevel()
+        self._CR_Rnk = _CR_Rnk.loc[:,['P','A','B','C','D','E','F']]
+        self._CR_Rnk = _CR_Rnk.fillna(0)
 
-district_a_meter_Normal_Meter = district_a_meter[district_a_meter['meter_status'] == 'Normal']
-district_a_meter_Normal_Meter_Count = district_a_meter_Normal_Meter['meterno'].count()
+    def get_dict(self):
+        return collections.OrderedDict({
+            '[ {} METERS SUMMARY ]'.format(self.name):'',
+            '{} Meter Count'.format(self.name):district_meter_Count,
+            '{} FW24.60 Meter Count'.format(self.name):district_1468_Count,
+            '{} FW24.60 Meter(%)'.format(self.name):district_1468_Rate,
+            '{} Meter LP Success(%)'.format(self.name):district_meter_LP_Success_Rate,
+            '{} Meter Dayend Success(%)'.format(self.name):district_meter_Dayend_Success_Rate,
+            '{} Average LP Push Count'.format(self.name):round(district_meter_Average_LP_Interval_Push_Count,2),
+            '{} Std Deviation LP Push Count'.format(self.name):round(district_meter_StdDev_LP_Interval_Push_Count,2),
+            '{} Meter LP-DayEnd-FULL Meter Count'.format(self.name):district_meter_LP_DayEnd_Full_Meter_Count,
+            '{} Meter LP-DayEnd-FULL Meter(%)'.format(self.name):district_meter_LP_DayEnd_Full_Meter_Rate,
+            '{} Meter Full 48 LP Interval Meter Count'.format(self.name):district_meter_Full_48_LP_Interval_Meter_Count,
+            '{} Meter Full 48 LP Interval Meter(%)'.format(self.name):district_meter_Full_48_LP_Interval_Meter_Rate,
+            '{} Meter Missing DayEnd Reading Meter Count'.format(self.name):district_meter_Missing_DayEnd_Reading_Meter_Count,
+            '{} Meter Normal Meter Count'.format(self.name):district_meter_Normal_Meter_Count,
+            '{} Meter SecConfig Meter Count'.format(self.name):district_meter_SecConfig_Meter_Count,
+            '{} Meter Config Meter Count'.format(self.name):district_meter_Config_Meter_Count,
+            '{} Meter Discovered Meter Count'.format(self.name):district_meter_Discovered_Meter_Count,
+            '{} Meter Failed Meter Count'.format(self.name):district_meter_Failed_Meter_Count,
+            '{} Meter Lost Meter Count'.format(self.name):district_meter_Lost_Meter_Count,
+        })
 
-district_a_meter_SecConfig_Meter = district_a_meter[district_a_meter['meter_status'] == 'SecConfig']
-district_a_meter_SecConfig_Meter_Count = district_a_meter_SecConfig_Meter['meterno'].count()
-district_a_meter_Discovered_Meter = district_a_meter[district_a_meter['meter_status'] == 'Discovered']
-district_a_meter_Discovered_Meter_Count = district_a_meter_Discovered_Meter['meterno'].count()
-district_a_meter_Config_Meter = district_a_meter[district_a_meter['meter_status'] == 'Configure']
-district_a_meter_Config_Meter_Count = district_a_meter_Config_Meter['meterno'].count()
-district_a_meter_Failed_Meter = district_a_meter[district_a_meter['meter_status'] == 'Failed']
-district_a_meter_Failed_Meter_Count = district_a_meter_Failed_Meter['meterno'].count()
-district_a_meter_Lost_Meter = district_a_meter[district_a_meter['meter_status'] == 'Lost']
-district_a_meter_Lost_Meter_Count = district_a_meter_Lost_Meter['meterno'].count()
-
-#LP-DayEnd-FULL_district_a Meter
-district_a_meter_LP_DayEnd_Full_Meter = district_a_meter[(district_a_meter['NoOfIntervals'] == 48) & (district_a_meter['DayEnd'] == 1)]
-district_a_meter_LP_DayEnd_Full_Meter_Count = district_a_meter_LP_DayEnd_Full_Meter['meterno'].count()
-district_a_meter_LP_DayEnd_Full_Meter_Rate = round((district_a_meter_LP_DayEnd_Full_Meter_Count/district_a_meter_Count)*100,2)
-district_a_meter_Missing_DayEnd_Reading = district_a_meter[district_a_meter['DayEnd'] != 1]
-district_a_meter_Missing_DayEnd_Reading_Meter_Count = district_a_meter_Missing_DayEnd_Reading['meterno'].count()
-Expected_district_a_meter_Total_LP_Count = ((district_a_meter_Count)*48)
-district_a_meter_Total_LP_Count = district_a_meter['NoOfIntervals'].sum()
-district_a_meter_Total_Dayend  = district_a_meter[district_a_meter['DayEnd'] == 1]
-district_a_meter_Total_Dayend_Count = district_a_meter_Total_Dayend['meterno'].count()
-district_a_meter_LP_Success_Rate = round((district_a_meter_Total_LP_Count/Expected_district_a_meter_Total_LP_Count)*100,2)
-district_a_meter_Dayend_Success_Rate  = round((district_a_meter_Total_Dayend_Count/district_a_meter_Count)*100,2)
-district_a_meter_Average_LP_Interval_Push_Count = district_a_meter['NoOfIntervals'].mean()
-district_a_meter_StdDev_LP_Interval_Push_Count = district_a_meter['NoOfIntervals'].std()
-
-CC_CR_Rnk = district_a_meter.pivot_table(values = ['meter_status'], index = ['name'], columns = ['abc_rank'], aggfunc = 'count')
-CC_CR_Rnk.columns = CC_CR_Rnk.columns.droplevel()
-CC_CR_Rnk = CC_CR_Rnk.loc[:,['P','A','B','C','D','E','F']]
-CC_CR_Rnk = CC_CR_Rnk.fillna(0)
-
-#district_b
-district_b_meter = cr_list[cr_list['District'].str.contains('District B', na=False)]
-district_b_meter_Count = district_b_meter['meterno'].count()
-district_b_meter_Full_48_LP_Interval = district_b_meter[district_b_meter['NoOfIntervals'] == 48]
-district_b_meter_Full_48_LP_Interval_Meter_Count = district_b_meter_Full_48_LP_Interval['meterno'].count()
-district_b_meter_Full_48_LP_Interval_Meter_Rate = round((district_b_meter_Full_48_LP_Interval_Meter_Count/district_b_meter_Count)*100,2)
-district_b_1468 = district_b_meter[district_b_meter['firmwareversion'].str.contains('-14.68', na=False)]
-district_b_1468_Count = district_b_1468['meterno'].count()
-district_b_1468_Rate  = round((district_b_1468_Count/district_b_meter_Count)*100,2)
-
-district_b_meter_Normal_Meter = district_b_meter[district_b_meter['meter_status'] == 'Normal']
-district_b_meter_Normal_Meter_Count = district_b_meter_Normal_Meter['meterno'].count()
-district_b_meter_SecConfig_Meter = district_b_meter[district_b_meter['meter_status'] == 'SecConfig']
-district_b_meter_SecConfig_Meter_Count = district_b_meter_SecConfig_Meter['meterno'].count()
-district_b_meter_Discovered_Meter = district_b_meter[district_b_meter['meter_status'] == 'Discovered']
-district_b_meter_Discovered_Meter_Count = district_b_meter_Discovered_Meter['meterno'].count()
-district_b_meter_Config_Meter = district_b_meter[district_b_meter['meter_status'] == 'Configure']
-district_b_meter_Config_Meter_Count = district_b_meter_Config_Meter['meterno'].count()
-district_b_meter_Failed_Meter = district_b_meter[district_b_meter['meter_status'] == 'Failed']
-district_b_meter_Failed_Meter_Count = district_b_meter_Failed_Meter['meterno'].count()
-district_b_meter_Lost_Meter = district_b_meter[district_b_meter['meter_status'] == 'Lost']
-district_b_meter_Lost_Meter_Count = district_b_meter_Lost_Meter['meterno'].count()
-
-#LP-DayEnd-FULL_District B Meter
-district_b_meter_LP_DayEnd_Full_Meter = district_b_meter[(district_b_meter['NoOfIntervals'] == 48) & (district_b_meter['DayEnd'] == 1)]
-district_b_meter_LP_DayEnd_Full_Meter_Count = district_b_meter_LP_DayEnd_Full_Meter['meterno'].count()
-district_b_meter_LP_DayEnd_Full_Meter_Rate = round((district_b_meter_LP_DayEnd_Full_Meter_Count/district_b_meter_Count)*100,2)
-district_b_meter_Missing_DayEnd_Reading = district_b_meter[district_b_meter['DayEnd'] != 1]
-district_b_meter_Missing_DayEnd_Reading_Meter_Count = district_b_meter_Missing_DayEnd_Reading['meterno'].count()
-Expected_district_b_meter_Total_LP_Count = ((district_b_meter_Count)*48)
-district_b_meter_Total_LP_Count = district_b_meter['NoOfIntervals'].sum()
-district_b_meter_Total_Dayend  = district_b_meter[district_b_meter['DayEnd'] == 1]
-district_b_meter_Total_Dayend_Count = district_b_meter_Total_Dayend['meterno'].count()
-district_b_meter_LP_Success_Rate = round((district_b_meter_Total_LP_Count/Expected_district_b_meter_Total_LP_Count)*100,2)
-district_b_meter_Dayend_Success_Rate  = round((district_b_meter_Total_Dayend_Count/district_b_meter_Count)*100,2)
-district_b_meter_Average_LP_Interval_Push_Count = district_b_meter['NoOfIntervals'].mean()
-district_b_meter_StdDev_LP_Interval_Push_Count = district_b_meter['NoOfIntervals'].std()
-
-TO_CR_Rnk = district_b_meter.pivot_table(values = ['meter_status'], index = ['name'], columns = ['abc_rank'], aggfunc = 'count')
-TO_CR_Rnk.columns = TO_CR_Rnk.columns.droplevel()
-TO_CR_Rnk = TO_CR_Rnk.loc[:,['P','A','B','C','D','E','F']]
-TO_CR_Rnk = TO_CR_Rnk.fillna(0)
-
-#district_C
-district_c_meter = cr_list[cr_list['District'].str.contains('District C', na=False)]
-district_c_meter_Count = district_c_meter['meterno'].count()
-district_c_meter_Full_48_LP_Interval = district_c_meter[district_c_meter['NoOfIntervals'] == 48]
-district_c_meter_Full_48_LP_Interval_Meter_Count = district_c_meter_Full_48_LP_Interval['meterno'].count()
-district_c_meter_Full_48_LP_Interval_Meter_Rate = round((district_c_meter_Full_48_LP_Interval_Meter_Count/district_c_meter_Count)*100,2)
-district_c_1468 = district_c_meter[district_c_meter['firmwareversion'].str.contains('-14.68', na=False)]
-district_c_1468_Count = district_c_1468['meterno'].count()
-district_c_1468_Rate  = round((district_c_1468_Count/district_c_meter_Count)*100,2)
-
-district_c_meter_Normal_Meter = district_c_meter[district_c_meter['meter_status'] == 'Normal']
-district_c_meter_Normal_Meter_Count = district_c_meter_Normal_Meter['meterno'].count()
-district_c_meter_SecConfig_Meter = district_c_meter[district_c_meter['meter_status'] == 'SecConfig']
-district_c_meter_SecConfig_Meter_Count = district_c_meter_SecConfig_Meter['meterno'].count()
-district_c_meter_Discovered_Meter = district_c_meter[district_c_meter['meter_status'] == 'Discovered']
-district_c_meter_Discovered_Meter_Count = district_c_meter_Discovered_Meter['meterno'].count()
-district_c_meter_Config_Meter = district_c_meter[district_c_meter['meter_status'] == 'Configure']
-district_c_meter_Config_Meter_Count = district_c_meter_Config_Meter['meterno'].count()
-district_c_meter_Failed_Meter = district_c_meter[district_c_meter['meter_status'] == 'Failed']
-district_c_meter_Failed_Meter_Count = district_c_meter_Failed_Meter['meterno'].count()
-district_c_meter_Lost_Meter = district_c_meter[district_c_meter['meter_status'] == 'Lost']
-district_c_meter_Lost_Meter_Count = district_c_meter_Lost_Meter['meterno'].count()
-
-#LP-DayEnd-FULL_District C Meter
-district_c_meter_LP_DayEnd_Full_Meter = district_c_meter[(district_c_meter['NoOfIntervals'] == 48) & (district_c_meter['DayEnd'] == 1)]
-district_c_meter_LP_DayEnd_Full_Meter_Count = district_c_meter_LP_DayEnd_Full_Meter['meterno'].count()
-district_c_meter_LP_DayEnd_Full_Meter_Rate = round((district_c_meter_LP_DayEnd_Full_Meter_Count/district_c_meter_Count)*100,2)
-district_c_meter_Missing_DayEnd_Reading = district_c_meter[district_c_meter['DayEnd'] != 1]
-district_c_meter_Missing_DayEnd_Reading_Meter_Count = district_c_meter_Missing_DayEnd_Reading['meterno'].count()
-Expected_district_c_meter_Total_LP_Count = ((district_c_meter_Count)*48)
-district_c_meter_Total_LP_Count = district_c_meter['NoOfIntervals'].sum()
-district_c_meter_Total_Dayend  = district_c_meter[district_c_meter['DayEnd'] == 1]
-district_c_meter_Total_Dayend_Count = district_c_meter_Total_Dayend['meterno'].count()
-district_c_meter_LP_Success_Rate = round((district_c_meter_Total_LP_Count/Expected_district_c_meter_Total_LP_Count)*100,2)
-district_c_meter_Dayend_Success_Rate  = round((district_c_meter_Total_Dayend_Count/district_c_meter_Count)*100,2)
-district_c_meter_Average_LP_Interval_Push_Count = district_c_meter['NoOfIntervals'].mean()
-district_c_meter_StdDev_LP_Interval_Push_Count = district_c_meter['NoOfIntervals'].std()
-
-TM_CR_Rnk = district_c_meter.pivot_table(values = ['meter_status'], index = ['name'], columns = ['abc_rank'], aggfunc = 'count')
-TM_CR_Rnk.columns = TM_CR_Rnk.columns.droplevel()
-TM_CR_Rnk = TM_CR_Rnk.loc[:,['P','A','B','C','D','E','F']]
-TM_CR_Rnk = TM_CR_Rnk.fillna(0)
-
-#district_d
-district_d_meter = cr_list[cr_list['District'].str.contains('District D', na=False)]
-district_d_meter_Count = district_d_meter['meterno'].count()
-district_d_meter_Full_48_LP_Interval = district_d_meter[district_d_meter['NoOfIntervals'] == 48]
-district_d_meter_Full_48_LP_Interval_Meter_Count = district_d_meter_Full_48_LP_Interval['meterno'].count()
-district_d_meter_Full_48_LP_Interval_Meter_Rate = round((district_d_meter_Full_48_LP_Interval_Meter_Count/district_d_meter_Count)*100,2)
-district_d_1468 = district_d_meter[district_d_meter['firmwareversion'].str.contains('-14.68', na=False)]
-district_d_1468_Count = district_d_1468['meterno'].count()
-district_d_1468_Rate  = round((district_d_1468_Count/district_d_meter_Count)*100,2)
-
-district_d_meter_Normal_Meter = district_d_meter[district_d_meter['meter_status'] == 'Normal']
-district_d_meter_Normal_Meter_Count = district_d_meter_Normal_Meter['meterno'].count()
-district_d_meter_SecConfig_Meter = district_d_meter[district_d_meter['meter_status'] == 'SecConfig']
-district_d_meter_SecConfig_Meter_Count = district_d_meter_SecConfig_Meter['meterno'].count()
-district_d_meter_Discovered_Meter = district_d_meter[district_d_meter['meter_status'] == 'Discovered']
-district_d_meter_Discovered_Meter_Count = district_d_meter_Discovered_Meter['meterno'].count()
-district_d_meter_Config_Meter = district_d_meter[district_d_meter['meter_status'] == 'Configure']
-district_d_meter_Config_Meter_Count = district_d_meter_Config_Meter['meterno'].count()
-district_d_meter_Failed_Meter = district_d_meter[district_d_meter['meter_status'] == 'Failed']
-district_d_meter_Failed_Meter_Count = district_d_meter_Failed_Meter['meterno'].count()
-district_d_meter_Lost_Meter = district_d_meter[district_d_meter['meter_status'] == 'Lost']
-district_d_meter_Lost_Meter_Count = district_d_meter_Lost_Meter['meterno'].count()
-
-#LP-DayEnd-FULL_District D Meter
-district_d_meter_LP_DayEnd_Full_Meter = district_d_meter[(district_d_meter['NoOfIntervals'] == 48) & (district_d_meter['DayEnd'] == 1)]
-district_d_meter_LP_DayEnd_Full_Meter_Count = district_d_meter_LP_DayEnd_Full_Meter['meterno'].count()
-district_d_meter_LP_DayEnd_Full_Meter_Rate = round((district_d_meter_LP_DayEnd_Full_Meter_Count/district_d_meter_Count)*100,2)
-district_d_meter_Missing_DayEnd_Reading = district_d_meter[district_d_meter['DayEnd'] != 1]
-district_d_meter_Missing_DayEnd_Reading_Meter_Count = district_d_meter_Missing_DayEnd_Reading['meterno'].count()
-Expected_district_d_meter_Total_LP_Count = ((district_d_meter_Count)*48)
-district_d_meter_Total_LP_Count = district_d_meter['NoOfIntervals'].sum()
-district_d_meter_Total_Dayend  = district_d_meter[district_d_meter['DayEnd'] == 1]
-district_d_meter_Total_Dayend_Count = district_d_meter_Total_Dayend['meterno'].count()
-district_d_meter_LP_Success_Rate = round((district_d_meter_Total_LP_Count/Expected_district_d_meter_Total_LP_Count)*100,2)
-district_d_meter_Dayend_Success_Rate  = round((district_d_meter_Total_Dayend_Count/district_d_meter_Count)*100,2)
-district_d_meter_Average_LP_Interval_Push_Count = district_d_meter['NoOfIntervals'].mean()
-district_d_meter_StdDev_LP_Interval_Push_Count = district_d_meter['NoOfIntervals'].std()
-
-TC_CR_Rnk = district_d_meter.pivot_table(values = ['meter_status'], index = ['name'], columns = ['abc_rank'], aggfunc = 'count')
-TC_CR_Rnk.columns = TC_CR_Rnk.columns.droplevel()
-TC_CR_Rnk = TC_CR_Rnk.loc[:,['P','A','B','C','D','E','F']]
-TC_CR_Rnk = TC_CR_Rnk.fillna(0)
+district_a = District(cr_list, 'A')
+district_b = District(cr_list, 'B')
+district_c = District(cr_list, 'C')
+district_d = District(cr_list, 'D')
 
 No_reading_meter = cr_list[cr_list['abc_rank'] == 'F']
 hexed_serial = pd.DataFrame(No_reading_meter['serialnumber'].astype(int))
@@ -325,7 +223,7 @@ Total_CellMeter_Count = Total_ALLCellMeter_Count - Total_LDAMeter_Count
 unlocated_meter_Count = unlocated_meter['meterno'].count()
 unknownbuilding_Count = cr_unknownbuilding['meterno'].count()
 
-all_meter_1468 = cr_list[cr_list['firmwareversion'].str.contains('-14.68', na=False)]
+all_meter_1468 = cr_list[cr_list['firmwareversion'].str.contains('-24.60', na=False)]
 all_meter_1468_Count = all_meter_1468['meterno'].count()
 all_meter_1468_1468_Rate  = round((all_meter_1468_Count/Total_AllMeter_Count )*100,2)
 
@@ -493,8 +391,8 @@ Performance = collections.OrderedDict({
 '[ KEY PERFORMANCE INDICATOR ]':'',
 'Total Meter Count':Total_AllMeter_Count,
 'Total Collector Count':Collector_Count,
-'Total Meter FW14.68 Meter Count':all_meter_1468_Count,
-'Total Meter FW14.68 Meter(%)':all_meter_1468_1468_Rate,
+'Total Meter FW24.60 Meter Count':all_meter_1468_Count,
+'Total Meter FW24.60 Meter(%)':all_meter_1468_1468_Rate,
 'All Meter LP Interval Push Success(%)':round(AllMeter_Total_LP_SuccessRate,2),
 'All Meter DayEnd Reading Push Success(%)':round(AllMeter_Total_DayEnd_Reading_SuccessRate,2),
 'Average LP Push Count':round(Average_LP_Interval_Push_Count,2),
@@ -537,29 +435,29 @@ Performance = collections.OrderedDict({
 'Latest Meters Full 48 LP Interval Meter(%)':Latest_Meters_Full_48_LP_Interval_Meter_Rate,
 'Latest Meters Missing DayEnd Reading Meter Count':Latest_Meters_Missing_DayEnd_Reading_Meter_Count,
 'Latest Meters Missing DayEnd Reading Meter(%)':Latest_Meters_Missing_DayEnd_Reading_Meter_Rate,
-'[ District A METERS SUMMARY ]':'',
-'District A Meter Count':district_a_meter_Count,
-'District A FW14.68 Meter Count':district_a_1468_Count,
-'District A FW14.68 Meter(%)':district_a_1468_Rate,
-'District A Meter LP Success(%)':district_a_meter_LP_Success_Rate,
-'District A Meter Dayend Success(%)':district_a_meter_Dayend_Success_Rate,
-'District A Average LP Push Count':round(district_a_meter_Average_LP_Interval_Push_Count,2),
-'District A Std Deviation LP Push Count':round(district_a_meter_StdDev_LP_Interval_Push_Count,2),
-'District A Meter LP-DayEnd-FULL Meter Count':district_a_meter_LP_DayEnd_Full_Meter_Count,
-'District A Meter LP-DayEnd-FULL Meter(%)':district_a_meter_LP_DayEnd_Full_Meter_Rate,
-'District A Meter Full 48 LP Interval Meter Count':district_a_meter_Full_48_LP_Interval_Meter_Count,
-'District A Meter Full 48 LP Interval Meter(%)':district_a_meter_Full_48_LP_Interval_Meter_Rate,
-'District A Meter Missing DayEnd Reading Meter Count':district_a_meter_Missing_DayEnd_Reading_Meter_Count,
-'District A Meter Normal Meter Count':district_a_meter_Normal_Meter_Count,
-'District A Meter SecConfig Meter Count':district_a_meter_SecConfig_Meter_Count,
-'District A Meter Config Meter Count':district_a_meter_Config_Meter_Count,
-'District A Meter Discovered Meter Count':district_a_meter_Discovered_Meter_Count,
-'District A Meter Failed Meter Count':district_a_meter_Failed_Meter_Count,
-'District A Meter Lost Meter Count':district_a_meter_Lost_Meter_Count,
+'[ {} METERS SUMMARY ]':'',
+'{} Meter Count':district_meter_Count,
+'{} FW24.60 Meter Count':district_1468_Count,
+'{} FW24.60 Meter(%)':district_1468_Rate,
+'{} Meter LP Success(%)':district_meter_LP_Success_Rate,
+'{} Meter Dayend Success(%)':district_meter_Dayend_Success_Rate,
+'{} Average LP Push Count':round(district_meter_Average_LP_Interval_Push_Count,2),
+'{} Std Deviation LP Push Count':round(district_meter_StdDev_LP_Interval_Push_Count,2),
+'{} Meter LP-DayEnd-FULL Meter Count':district_meter_LP_DayEnd_Full_Meter_Count,
+'{} Meter LP-DayEnd-FULL Meter(%)':district_meter_LP_DayEnd_Full_Meter_Rate,
+'{} Meter Full 48 LP Interval Meter Count':district_meter_Full_48_LP_Interval_Meter_Count,
+'{} Meter Full 48 LP Interval Meter(%)':district_meter_Full_48_LP_Interval_Meter_Rate,
+'{} Meter Missing DayEnd Reading Meter Count':district_meter_Missing_DayEnd_Reading_Meter_Count,
+'{} Meter Normal Meter Count':district_meter_Normal_Meter_Count,
+'{} Meter SecConfig Meter Count':district_meter_SecConfig_Meter_Count,
+'{} Meter Config Meter Count':district_meter_Config_Meter_Count,
+'{} Meter Discovered Meter Count':district_meter_Discovered_Meter_Count,
+'{} Meter Failed Meter Count':district_meter_Failed_Meter_Count,
+'{} Meter Lost Meter Count':district_meter_Lost_Meter_Count,
 '[ District B METERS SUMMARY ]':'',
 'District B Meter Count':district_b_meter_Count,
-'District B FW14.68 Meter Count':district_b_1468_Count,
-'District B FW14.68 Meter(%)':district_b_1468_Rate,
+'District B FW24.60 Meter Count':district_b_1468_Count,
+'District B FW24.60 Meter(%)':district_b_1468_Rate,
 'District B Meter LP Success(%)':district_b_meter_LP_Success_Rate,
 'District B Meter Dayend Success(%)':district_b_meter_Dayend_Success_Rate,
 'District B Average LP Push Count':round(district_b_meter_Average_LP_Interval_Push_Count,2),
@@ -577,8 +475,8 @@ Performance = collections.OrderedDict({
 'District B Meter Lost Meter Count':district_b_meter_Lost_Meter_Count,
 '[ District C METERS SUMMARY ]':'',
 'District C Meter Count':district_c_meter_Count,
-'District C FW14.68 Meter Count':district_c_1468_Count,
-'District C FW14.68 Meter(%)':district_c_1468_Rate,
+'District C FW24.60 Meter Count':district_c_1468_Count,
+'District C FW24.60 Meter(%)':district_c_1468_Rate,
 'District C Meter LP Success(%)':district_c_meter_LP_Success_Rate,
 'District C Meter Dayend Success(%)':district_c_meter_Dayend_Success_Rate,
 'District C Average LP Push Count':round(district_c_meter_Average_LP_Interval_Push_Count,2),
@@ -596,8 +494,8 @@ Performance = collections.OrderedDict({
 'District C Meter Lost Meter Count':district_c_meter_Lost_Meter_Count,
 '[ District D METERS SUMMARY ]':'',
 'District D Meter Count':district_d_meter_Count,
-'District D FW14.68 Meter Count':district_d_1468_Count,
-'District D FW14.68 Meter(%)':district_d_1468_Rate,
+'District D FW24.60 Meter Count':district_d_1468_Count,
+'District D FW24.60 Meter(%)':district_d_1468_Rate,
 'District D Meter LP Success(%)':district_d_meter_LP_Success_Rate,
 'District D Meter Dayend Success(%)':district_d_meter_Dayend_Success_Rate,
 'District D Average LP Push Count':round(district_d_meter_Average_LP_Interval_Push_Count,2),
@@ -719,12 +617,12 @@ CR_perf = pd.concat([CR_perf, CR_perf_std], axis=1, join_axes=[CR_perf.index])
 CR_perf = CR_perf.round()
 CR_perf.columns = ['Average LP Count','Std LP Count']
 
-CR_perf_district_a = district_a_meter[district_a_meter['name'].str.startswith('8020', na=False)]
-CR_perf_district_a = CR_perf_district_a.groupby(['name'])['NoOfIntervals'].mean()
-CR_perf_district_a_std = district_a_meter.groupby(['name'])['NoOfIntervals'].std()
-CR_perf_district_a = pd.concat([CR_perf_district_a, CR_perf_district_a_std], axis=1, join_axes=[CR_perf_district_a.index])
-CR_perf_district_a = CR_perf_district_a.round()
-CR_perf_district_a.columns = ['Average LP Count','Std LP Count']
+CR_perf_district = district_meter[district_meter['name'].str.startswith('8020', na=False)]
+CR_perf_district = CR_perf_district.groupby(['name'])['NoOfIntervals'].mean()
+CR_perf_district_std = district_meter.groupby(['name'])['NoOfIntervals'].std()
+CR_perf_district = pd.concat([CR_perf_district, CR_perf_district_std], axis=1, join_axes=[CR_perf_district.index])
+CR_perf_district = CR_perf_district.round()
+CR_perf_district.columns = ['Average LP Count','Std LP Count']
 
 CR_perf_district_b = district_b_meter[district_b_meter['name'].str.startswith('8020', na=False)]
 CR_perf_district_b = CR_perf_district_b.groupby(['name'])['NoOfIntervals'].mean()
@@ -752,8 +650,8 @@ writer = pd.ExcelWriter('%sReading_Performance_Report%s_%s.xlsx' % (dir,target_d
 df_performance.to_excel(writer, "Performance Report")
 cr_list.to_excel(writer,"Analyzed Individual Meters", index=False)
 CR_perf.to_excel(writer,"CR Performance")
-CR_perf_district_a.to_excel(writer,"District A CR Performance")
-CC_CR_Rnk.to_excel(writer,"District A CR ABC Rank")
+CR_perf_district.to_excel(writer,"{} CR Performance")
+CC_CR_Rnk.to_excel(writer,"{} CR ABC Rank")
 CR_perf_district_b.to_excel(writer,"District B CR Performance")
 TO_CR_Rnk.to_excel(writer,"District B CR ABC Rank")
 CR_perf_district_c.to_excel(writer,"District C CR Performance")

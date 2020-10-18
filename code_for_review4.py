@@ -10,7 +10,6 @@ from openpyxl.drawing.image import Image
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-#Please change file name to put _X number 'AllMeters_20181219_X.xlsx'
 allmeter = 'ReadingPerf_20200420.csv'
 crloc = 'Collector_Location20200224.xlsx'
 full_smart_meters = pd.read_csv('C:/Users/TokuharM.AP/mywork/%s' % allmeter, sep=',',skiprows=1)
@@ -41,6 +40,8 @@ Config_Meter = cr_list[cr_list['meter_status'] == 'Configure']
 Failed_Meter = cr_list[cr_list['meter_status'] == 'Failed']
 Lost_Meter = cr_list[cr_list['meter_status'] == 'Lost']
 
+#target_date = cr_list.iloc[0,7].strftime('%Y-%m-%d')
+
 Total_AllMeter_Count = cr_list['meterno'].count()
 Total_HighRiseMeter_Count = cr_highrise['meterno'].count()
 Total_VillageMeter_Count = cr_village['meterno'].count()
@@ -66,14 +67,7 @@ hexed_serial = hexed_serial['hex_serial'].apply(lambda x:format(x, 'x'))
 No_reading_meter = pd.concat([No_reading_meter, hexed_serial], axis=1)
 No_reading_meter = No_reading_meter.reset_index(drop=True)
 
-#FW version performance
-fw_avg = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.mean})
-fw_std = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.std})
-fw_perf = pd.concat([fw_avg, fw_std], axis=1, join_axes=[fw_avg.index])
-fw_perf.columns = ['LP Average', 'LP Std Deviation']
-fw_perf = fw_perf.round()
-
-class District:
+class DistrictPerformance:
     def __init__(self, cr_list, attr):
         self.name = "{}".format(attr)
         self.district_meter = cr_list[cr_list['District'].str.contains(self.name, na=False)]
@@ -96,7 +90,6 @@ class District:
         self.district_meter_Failed_Meter_Count = self.district_meter_Failed_Meter['meterno'].count()
         self.district_meter_Lost_Meter = self.district_meter[self.district_meter['meter_status'] == 'Lost']
         self.district_meter_Lost_Meter_Count = self.district_meter_Lost_Meter['meterno'].count()
-        #LP-DayEnd-FULL_district Meter
         self.district_meter_LP_DayEnd_Full_Meter = self.district_meter[(self.district_meter['NoOfIntervals'] == 48) & (self.district_meter['DayEnd'] == 1)]
         self.district_meter_LP_DayEnd_Full_Meter_Count = self.district_meter_LP_DayEnd_Full_Meter['meterno'].count()
         self.district_meter_LP_DayEnd_Full_Meter_Rate = round((self.district_meter_LP_DayEnd_Full_Meter_Count/self.district_meter_Count)*100,2)
@@ -110,11 +103,31 @@ class District:
         self.district_meter_Dayend_Success_Rate  = round((self.district_meter_Total_Dayend_Count/self.district_meter_Count)*100,2)
         self.district_meter_Average_LP_Interval_Push_Count = self.district_meter['NoOfIntervals'].mean()
         self.district_meter_StdDev_LP_Interval_Push_Count = self.district_meter['NoOfIntervals'].std()
-        #abc_rank
-        self._CR_Rnk = self.district_meter.pivot_table(values = ['meter_status'], index = ['name'], columns = ['abc_rank'], aggfunc = 'count')
-        #self._CR_Rnk.columns = self._CR_Rnk.columns.droplevel()
-        self._CR_Rnk = self._CR_Rnk.loc[:,['P','A','B','C','D','E','F']]
-        self._CR_Rnk = self._CR_Rnk.fillna(0)
+
+        self.cr_rank = self.district_meter.pivot_table(values = ['meter_status'], index = ['name'], columns = ['abc_rank'], aggfunc = 'count')
+        #self.cr_rank.columns = self.cr_rank.columns.droplevel()
+        self.cr_rank = self.cr_rank.loc[:,['P','A','B','C','D','E','F']]
+        self.cr_rank = self.cr_rank.fillna(0)
+
+        self.cr_perf = cr_list[cr_list['name'].str.startswith('98020', na=False)]
+        self.cr_perf_avg = self.cr_perf.groupby(['name'])['NoOfIntervals'].mean()
+        self.cr_perf_std = self.cr_perf.groupby(['name'])['NoOfIntervals'].std()
+        self.cr_perf = pd.concat([self.cr_perf_avg, self.cr_perf_std], axis=1, join_axes=[self.cr_perf_avg.index])
+        self.cr_perf = self.cr_perf.round()
+        self.cr_perf = self.cr_perf.fillna(0)
+        self.cr_perf.columns = ['Average LP Count','Std LP Count']
+
+        self.region_perf = cr_list.groupby(['Estates / Villages'])['NoOfIntervals'].mean()
+        self.region_perf_std = cr_list.groupby(['Estates / Villages'])['NoOfIntervals'].std()
+        self.region_perf = pd.concat([self.region_perf, self.region_perf_std], axis=1, join_axes=[self.region_perf.index])
+        self.region_perf = self.region_perf.round()
+        self.region_perf = self.region_perf.fillna(0)
+        self.region_perf.columns = ['Average LP Count','Std LP Count']
+
+        self.area_perf = cr_list.pivot_table(values = ['meter_status'], index = ['Estates / Villages'], columns = ['abc_rank'], aggfunc = 'count')
+        self.area_perf.columns = self.area_perf.columns.droplevel()
+        self.area_perf = self.area_perf.loc[:,['P','A','B','C','D','E','F']]
+        self.area_perf = self.area_perf.fillna(0)
 
     def get_dict(self):
         return collections.OrderedDict({
@@ -138,6 +151,13 @@ class District:
             '{} Meter Failed Meter Count'.format(self.name):self.district_meter_Failed_Meter_Count,
             '{} Meter Lost Meter Count'.format(self.name):self.district_meter_Lost_Meter_Count,
         })
+
+class CollectorPerformance(DistrictPerformance):
+    def __init__(self, cr_list):
+        super().__init__(cr_list, 'A') 
+
+    def get_collector_statistics(self):
+        return self.cr_perf
 
 class KeyPerformanceIndicator:
     def __init__(self, Total_AllMeter_Count, Total_LDAMeter_Count, onlycell_meter, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_CellMeter_Count, cr_list):
@@ -184,7 +204,7 @@ class KeyPerformanceIndicator:
         self.NO_DayEnd_Reading_but_with_LP_Reading_Meter_Count = self.NO_DayEnd_Reading_but_with_LP_Reading_Meter['NoOfIntervals'].count()
         self.NO_DayEnd_Reading_but_with_LP_Reading_Meter_Rate = (self.NO_DayEnd_Reading_but_with_LP_Reading_Meter_Count/Total_AllMeter_Count)*100
 
-    def get_dict_kpi(self):
+    def get_dict(self):
         return collections.OrderedDict({
             '[ KEY PERFORMANCE INDICATOR ]':'',
             'Total Meter Count':Total_AllMeter_Count,
@@ -215,7 +235,6 @@ class KeyPerformanceIndicator:
 
 class SLAPerformance:
     def __init__(self, cr_list):
-        #SLA-Meters Effective Meter Calculation(Only Normal meters (w/o LDA Meter) that passed more than 7 days from initial Normal date)
         self.today_date = dt.date.today().strftime('%Y-%m-%d') 
         cr_list['initialNormalDate'] = pd.to_datetime(cr_list['initialNormalDate'], format='%Y-%m-%d')
         cr_list['date'] = cr_list['date'].fillna(self.today_date)
@@ -233,7 +252,6 @@ class SLAPerformance:
         self.EffectiveMeters_Full_48_LP_Interval = self.Effective_Meter[self.Effective_Meter['NoOfIntervals'] == 48]
         self.EffectiveMeters_Full_48_LP_Interval_Meter_Count = self.EffectiveMeters_Full_48_LP_Interval['meterno'].count()
         self.EffectiveMeters_Full_48_LP_Interval_Meter_Rate = round((self.EffectiveMeters_Full_48_LP_Interval_Meter_Count/self.Effective_Meter_Count)*100,2)
-        #LP-DayEnd-FULL_SLA_Meter
         self.LP_DayEnd_Full_Effective_Meter = self.Effective_Meter[(self.Effective_Meter['NoOfIntervals'] == 48)&(self.Effective_Meter['DayEnd'] == 1)]
         self.LP_DayEnd_Full_Effective_Meter_Count = self.LP_DayEnd_Full_Effective_Meter['meterno'].count()
         self.LP_DayEnd_Full_Effective_Meter_Rate = round((self.LP_DayEnd_Full_Effective_Meter_Count/self.Effective_Meter_Count)*100,2)
@@ -249,7 +267,7 @@ class SLAPerformance:
         self.Effective_Meter_Average_LP_Interval_Push_Count = self.Effective_Meter['NoOfIntervals'].mean()
         self.Effective_Meter_StdDev_LP_Interval_Push_Count = self.Effective_Meter['NoOfIntervals'].std()
     
-    def get_dict_sla(self):
+    def get_dict(self):
         return collections.OrderedDict({
         '[ SLA METERS PERFORMANCE (NORMAL FOR OVER 7DAYS) ]':'',
             'SLA Meter Count':self.Effective_Meter_Count,
@@ -267,13 +285,11 @@ class SLAPerformance:
 
 class LatestMeterPerformance:
     def __init__(self, cr_list):
-        #Latest-Meters(Registered in last 30days)
         self.Latest_Meters = cr_list[cr_list['DaysAfterDis']  < '30 days']
         self.Latest_Meters_Count = self.Latest_Meters['meterno'].count()
         self.Latest_Meters_Full_48_LP_Interval = self.Latest_Meters[self.Latest_Meters['NoOfIntervals'] == 48]
         self.Latest_Meters_Full_48_LP_Interval_Meter_Count = self.Latest_Meters_Full_48_LP_Interval['meterno'].count()
         self.Latest_Meters_Full_48_LP_Interval_Meter_Rate = round((self.Latest_Meters_Full_48_LP_Interval_Meter_Count/self.Latest_Meters_Count)*100,2)
-        #LP-DayEnd-FULL_SLA_Meter
         self.LP_DayEnd_Full_Latest_Meters = self.Latest_Meters[(self.Latest_Meters['NoOfIntervals'] == 48)&(self.Latest_Meters['DayEnd'] == 1)]
         self.LP_DayEnd_Full_Latest_Meters_Count = self.LP_DayEnd_Full_Latest_Meters['meterno'].count()
         self.LP_DayEnd_Full_Latest_Meters_Rate = round((self.LP_DayEnd_Full_Latest_Meters_Count/self.Latest_Meters_Count)*100,2)
@@ -289,7 +305,7 @@ class LatestMeterPerformance:
         self.Latest_Meters_Average_LP_Interval_Push_Count = self.Latest_Meters['NoOfIntervals'].mean()
         self.Latest_Meters_StdDev_LP_Interval_Push_Count = self.Latest_Meters['NoOfIntervals'].std()
 
-    def get_dict_latest(self):
+    def get_dict(self):
         return collections.OrderedDict({
             '[ LATEST METERS PERFORMANCE (REGISTERED IN LAST 30DAYS) ]':'',
             'Latest Meter Count':self.Latest_Meters_Count,
@@ -304,20 +320,27 @@ class LatestMeterPerformance:
         })
 
 class AllMetersCount:
-    def get_dict_allmetercount(self, Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, unlocated_meter_Count):
+    def __init__(self, Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, unlocated_meter_Count):
+        self.Total_ALLCellMeter_Count = Total_ALLCellMeter_Count
+        self.Total_HighRiseMeter_Count = Total_HighRiseMeter_Count
+        self.Total_VillageMeter_Count = Total_VillageMeter_Count
+        self.Total_CellMeter_Count = Total_CellMeter_Count
+        self.Total_LDAMeter_Count = Total_LDAMeter_Count
+        self.unlocated_meter_Count = unlocated_meter_Count
+
+    def get_dict(self):
         return collections.OrderedDict({
             '[ OVERALL METERS COUNT SUMMARY ]':'',
-            'Total HighRise Meter Count':Total_HighRiseMeter_Count,
-            'Total Village Meter Count':Total_VillageMeter_Count,
-            'Total Cell Meter Count':Total_CellMeter_Count,
-            'Total All Cell Type Meter Count':Total_ALLCellMeter_Count,
-            'Total LDA Meter Count':Total_LDAMeter_Count,
-            'Unlocated Meter Count':unlocated_meter_Count,
+            'Total HighRise Meter Count':self.Total_HighRiseMeter_Count,
+            'Total Village Meter Count':self.Total_VillageMeter_Count,
+            'Total Cell Meter Count':self.Total_CellMeter_Count,
+            'Total All Cell Type Meter Count':self.Total_ALLCellMeter_Count,
+            'Total LDA Meter Count':self.Total_LDAMeter_Count,
+            'Unlocated Meter Count':self.unlocated_meter_Count,
         })
 
 class AllLPIntervalPushSuccessRate:
     def __init__(self, Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, cr_highrise, cr_village, onlycell_meter, LDA_meter):
-        #Overall LP Push % Peformance
         self.Expected_HighRiseMeter_Total_LP_Count = Total_HighRiseMeter_Count*48
         self.HighRiseMeter_Total_LP_Count = cr_highrise['NoOfIntervals'].sum()
         self.Expected_VillageMeter_Total_LP_Count = Total_VillageMeter_Count*48
@@ -334,7 +357,7 @@ class AllLPIntervalPushSuccessRate:
         self.CellMeter_Total_LP_SuccessRate = (self.CellMeter_Total_LP_Count/self.Expected_CellMeter_Total_LP_Count)*100
         self.LDAMeter_Total_LP_SuccessRate = (self.LDAMeter_Total_LP_Count/self.Expected_LDAMeter_Total_LP_Count)*100
     
-    def get_dict_alllpintervalpushsuccessrate(self):
+    def get_dict(self):
         return collections.OrderedDict({
             '[ OVERALL LP INTERVAL PUSH SUCCESS % ]':'',
             'HighRise Meter Total LP Interval Push Success(%)':round(self.HighRiseMeter_Total_LP_SuccessRate,2),
@@ -362,7 +385,7 @@ class AllDayendPushSuccessRate:
         self.CellMeter_Total_DayEnd_Reading_SuccessRate = (self.CellMeter_Total_DayEnd_Reading_Count/self.Expected_CellMeter_Total_DayEnd_Reading_Count)*100
         self.LDAMeter_Total_DayEnd_Reading_SuccessRate = (self.LDAMeter_Total_DayEnd_Reading_Count/self.Expected_LDAMeter_Total_DayEnd_Reading_Count)*100
 
-    def get_dict_alldayendpushsuccessrate(self):
+    def get_dict(self):
         return collections.OrderedDict({
             '[ OVERALL DAYEND READING PUSH SUCCESS % ]':'',
             'HighRise Meter Total DayEnd Reading Push Success(%)':round(self.HighRiseMeter_Total_DayEnd_Reading_SuccessRate,2),
@@ -380,7 +403,6 @@ class NoLpPushMeterSummary():
         self.hexed_serial = self.hexed_serial['hex_serial'].apply(lambda x:format(x, 'x'))
         self.No_reading_meter = pd.concat([self.No_reading_meter, self.hexed_serial], axis=1)
         self.No_reading_meter = self.No_reading_meter.reset_index(drop=True)
-        #No Reading Meter per Status
         self.No_Reading_RF_meter = self.No_reading_meter[self.No_reading_meter['endpointtypeid'] == 9]
         self.No_Reading_cell_meter = self.No_reading_meter[self.No_reading_meter['endpointtypeid'] == 15]
         self.No_Reading_Normal_Meter = self.No_reading_meter[self.No_reading_meter['meter_status'] == 'Normal']
@@ -394,7 +416,6 @@ class NoLpPushMeterSummary():
         self.No_reading_meter_Highrise = self.No_reading_meter[self.No_reading_meter['BuildingType'].isin(['Highrise'])]
         self.No_reading_meter_Village = self.No_reading_meter[self.No_reading_meter['BuildingType'].isin(['Village'])]
         self.No_reading_meter_Unlocated = self.No_reading_meter[self.No_reading_meter['BuildingType'].isin(['Unknown BuildingType'])]
-        #Number of No Reading Meter Status Count
         self.No_Reading_Meter_Total_Count = self.No_reading_meter['abc_rank'].count()
         self.No_Reading_RF_meter_Count = self.No_Reading_RF_meter['meterno'].count()
         self.No_Reading_Cell_meter_Count = self.No_Reading_cell_meter['meterno'].count()
@@ -409,7 +430,6 @@ class NoLpPushMeterSummary():
         self.No_reading_meter_Highrise_count = self.No_reading_meter_Highrise['abc_rank'].count()
         self.No_reading_meter_Village_count = self.No_reading_meter_Village['abc_rank'].count()
         self.No_reading_meter_Unlocated_count = self.No_reading_meter_Unlocated['abc_rank'].count()
-        #No Reading MeterStatus Composition Rate
         self.No_Reading_Meter_Rate = (self.No_Reading_Meter_Total_Count/Total_AllMeter_Count)*100
         self.No_Reading_Meter_Highrise_Rate = (self.No_reading_meter_Highrise_count/self.No_Reading_Meter_Total_Count)*100
         self.No_Reading_Meter_Village_Rate = (self.No_reading_meter_Village_count/self.No_Reading_Meter_Total_Count)*100
@@ -421,7 +441,7 @@ class NoLpPushMeterSummary():
         self.No_Reading_Failed_Meter_Rate = (self.No_reading_Failed_meter_count/self.No_Reading_Meter_Total_Count)*100
         self.No_Reading_Lost_Meter_Rate = (self.No_reading_Lost_meter_count/self.No_Reading_Meter_Total_Count)*100
 
-    def get_dict_allnolppushmetersummary(self):
+    def get_dict(self):
         return collections.OrderedDict({
             '[ OVERALL NO LP READING METERS SUMMARY ]':'',
             'NO LP Reading Highrise Meter Count':self.No_reading_meter_Highrise_count,
@@ -455,7 +475,6 @@ class MeterStatusCount:
         self.Config_Meter = cr_list[cr_list['meter_status'] == 'Configure']
         self.Failed_Meter = cr_list[cr_list['meter_status'] == 'Failed']
         self.Lost_Meter = cr_list[cr_list['meter_status'] == 'Lost']
-        #Meter Status Count
         self.Normal_Meter_Count = self.Normal_Meter['meterno'].count()
         self.SecConfig_Meter_Count = self.SecConfig_Meter['meterno'].count()
         self.Config_Meter_Count = self.Config_Meter['meterno'].count()
@@ -463,7 +482,7 @@ class MeterStatusCount:
         self.Failed_Meter_Count = self.Failed_Meter['meterno'].count()
         self.Lost_Meter_Count = self.Lost_Meter['meterno'].count()
 
-    def get_dict_meterstatuscount(self):
+    def get_dict(self):
         return collections.OrderedDict({
             '[ METER STATUS COUNT WITH READINGS ]':'',
             'Normal Status Meter Count':self.Normal_Meter_Count,
@@ -476,7 +495,6 @@ class MeterStatusCount:
 
 class AllLpPushCountPerformance:
     def __init__(self, cr_list, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_LDAMeter_Count, cr_highrise, cr_village, Total_CellMeter_Count, onlycell_meter, LDA_meter):
-        #Overall LP Push Count Peformance
         self.Expected_AllMeter_Total_LP_Count = (((Total_HighRiseMeter_Count+Total_VillageMeter_Count+unknownbuilding_Count)-Total_LDAMeter_Count)*48)+(Total_LDAMeter_Count*144)
         self.AllMeter_Total_LP_Count = cr_list['NoOfIntervals'].sum()
         self.Expected_HighRiseMeter_Total_LP_Count = Total_HighRiseMeter_Count*48
@@ -500,7 +518,7 @@ class AllLpPushCountPerformance:
         self.Full144_LP_Interval_LDAMeter_Count = cr_list['NoOfIntervals'] == 144
         self.Full144_LP_Interval_LDAMeter_Count = self.Full144_LP_Interval_LDAMeter_Count.sum()
     
-    def get_dict_alllppushcountperformance(self):
+    def get_dict(self):
         return collections.OrderedDict({
         '[ OVERALL LP PUSH COUNT PERFORMANCE ]':'',
         'Expected All Meter Total LP Interval Push Count': self.Expected_AllMeter_Total_LP_Count,
@@ -541,7 +559,7 @@ class AllDayendPushCountPerformance:
         self.Missing_DayEnd_Reading_CellMeter_Count = self.Expected_CellMeter_Total_DayEnd_Reading_Count-self.CellMeter_Total_DayEnd_Reading_Count
         self.Missing_DayEnd_Reading_LDAMeter_Count = self.Expected_LDAMeter_Total_DayEnd_Reading_Count-self.LDAMeter_Total_DayEnd_Reading_Count
 
-    def get_dict_alldayendpushcountperformance(self):
+    def get_dict(self):
         return collections.OrderedDict({
         '[ OVERALL DAYEND READING PUSH COUNT PERFORMANCE ]':'',
         'Expected All Meter Total DayEnd Reading Push Count': self.Expected_AllMeter_Total_DayEnd_Reading_Count,
@@ -563,17 +581,15 @@ class AllDayendPushCountPerformance:
         'Missing DayEnd Reading LDA Meter Count':self.Missing_DayEnd_Reading_LDAMeter_Count
         })
 
-
 class MeterTypeCompositionRate:
-    def __init__(self, Total_AllMeter_Count, Normal_Meter_Count, SecConfig_Meter_Count, Config_Meter_Count, Discovered_Meter_Count, Failed_Meter_Count, Lost_Meter_Count, Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unlocated_meter_Count, Total_LDAMeter_Count, Total_CellMeter_Count):
-        #MeterType Composition Rate
+    def __init__(self, Total_AllMeter_Count, Normal_Meter_Count, SecConfig_Meter_Count, Config_Meter_Count, Discovered_Meter_Count, Failed_Meter_Count, Lost_Meter_Count, 
+    Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unlocated_meter_Count, Total_LDAMeter_Count, Total_CellMeter_Count):
         self.HighRiseMeter_Rate = (Total_HighRiseMeter_Count/Total_AllMeter_Count)*100
         self.VillageMeter_Rate = (Total_VillageMeter_Count/Total_AllMeter_Count)*100
         self.AllCellMeter_Rate = (Total_ALLCellMeter_Count/Total_AllMeter_Count)*100
         self.CellMeter_Rate = (Total_CellMeter_Count/Total_AllMeter_Count)*100
         self.LDAMeter_Rate = (Total_LDAMeter_Count/Total_AllMeter_Count)*100
         self.UnlocatedMeter_Rate = (unlocated_meter_Count/Total_AllMeter_Count)*100
-        #MeterStatus Composition Rate
         self.Normal_Meter_Rate = (Normal_Meter_Count/Total_AllMeter_Count)*100
         self.SecConfig_Meter_Rate = (SecConfig_Meter_Count/Total_AllMeter_Count)*100
         self.Config_Meter_Rate = (Config_Meter_Count/Total_AllMeter_Count)*100
@@ -581,7 +597,7 @@ class MeterTypeCompositionRate:
         self.Failed_Meter_Rate = (Failed_Meter_Count/Total_AllMeter_Count)*100
         self.Lost_Meter_Rate = (Lost_Meter_Count/Total_AllMeter_Count)*100
 
-    def get_dict_metertypecompositionrate(self):
+    def get_dict(self):
         return collections.OrderedDict({
         '[ METER TYPE COMPOSITION RATE ]':'',
         'HighRise Meter(%)':round(self.HighRiseMeter_Rate,2),
@@ -598,48 +614,199 @@ class MeterTypeCompositionRate:
         'Lost Status Meter(%)':round(self.Lost_Meter_Rate,3)
         })
 
+class FirmwarePerformance():
+    def __init__(self, cr_list):
+        self.fw_avg = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.mean})
+        self.fw_std = cr_list.pivot_table(values = ['NoOfIntervals'], index = ['firmwareversion'], aggfunc = {'NoOfIntervals': np.std})
+        self.fw_perf = pd.concat([self.fw_avg, self.fw_std], axis=1, join_axes=[self.fw_avg.index])
+        self.fw_perf.columns = ['LP Average', 'LP Std Deviation']
+        self.fw_perf = self.fw_perf.round()
+        
+    def output_fw_stats(self):
+        return self.fw_perf
+
+class ToDataFrame():
+    def __init__(self, param1, param2):
+        self.title = "{}".format(param1)
+        self.performance = pd.DataFrame(pd.io.json.json_normalize(param2).T)
+        self.performance.columns = [self.title]
+
+    def output_dataframe(self):
+        return self.performance
+
+class WriteToExcel(DistrictPerformance):
+    def __init__(self, dfname, sheetname, dfname2, sheetname2, sheetname3, sheetname4, sheetname5, sheetname6, todaydate):
+        super().__init__(cr_list, 'A') 
+        #super().__init__(cr_list)
+        self.dir = 'C:/Users/TokuharM.AP/mywork/'
+        self.writer = pd.ExcelWriter('%sReading_Performance_Report_%s.xlsx' % (self.dir, todaydate))
+
+    def write_to_excel(self, dfname, sheetname, dfname2, sheetname2, sheetname3, sheetname4, sheetname5, sheetname6):
+        dfname.to_excel(self.writer, sheetname)
+        dfname2.to_excel(self.writer, sheetname2, index=False)
+        self.cr_perf.to_excel(self.writer, sheetname3)
+        #self.Latest_Meters.to_excel(self.writer, sheetname4)
+        #self.fw_perf.to_excel(self.writer, sheetname5)
+        self.cr_rank.to_excel(self.writer, sheetname4)
+        self.region_perf.to_excel(self.writer, sheetname5)
+        self.area_perf.to_excel(self.writer, sheetname6)
+
+        self.workbook  = self.writer.book
+        self.worksheet = self.writer.sheets[sheetname]
+        self.cell_format = self.workbook.add_format()
+        self.cell_format.set_align('right')
+        self.worksheet.set_column(0,0,68, self.cell_format)
+        self.worksheet.set_column(1,10,17)
+
+        self.worksheet = self.writer.sheets[sheetname3]
+        self.worksheet.set_column(0,0,27)
+        self.worksheet.set_column(1,2,16)
+
+        self.worksheet = self.writer.sheets[sheetname4]
+        self.worksheet.set_column(0,0,11)
+        self.worksheet.set_column(1,7,9)
+
+        self.worksheet = self.writer.sheets[sheetname5]
+        self.worksheet.set_column(0,0,27)
+        self.worksheet.set_column(1,2,16)
+
+        self.worksheet = self.writer.sheets[sheetname6]
+        self.worksheet.set_column(0,0,37)
+        self.worksheet.set_column(1,7,9)
+        self.writer.save()
+
 def main():
-    district_list = list(
-    [District(cr_list, 'district_a'),
-    District(cr_list, 'district_b'),
-    District(cr_list, 'district_c'),
-    District(cr_list, 'district_d')])
+    #elements_list = ['District A', 'District B', 'District C', 'District D', 'KPI_METER_COUNT']
+    elements_dic = {}
 
-    for district in district_list:
-        print(district.get_dict())
+    elements_dic['KEY PERFORMANCE INDICATOR'] = KeyPerformanceIndicator(
+    Total_AllMeter_Count,
+    Total_LDAMeter_Count,
+    onlycell_meter,
+    Total_HighRiseMeter_Count,
+    Total_VillageMeter_Count,
+    unknownbuilding_Count,
+    Total_CellMeter_Count,
+    cr_list)
 
-    kpimetercount = KeyPerformanceIndicator(Total_AllMeter_Count, Total_LDAMeter_Count, onlycell_meter, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_CellMeter_Count, cr_list)
-    print(kpimetercount.get_dict_kpi())
+    elements_dic['SLA PERFORMANCE']  = SLAPerformance(
+    cr_list)
 
-    slametercount = SLAPerformance(cr_list)
-    print(slametercount.get_dict_sla())
+    elements_dic['LATEST METER PERFORMANCE'] = LatestMeterPerformance(
+    cr_list)
+    
+    elements_dic['ALL METERS COUNT'] = AllMetersCount(
+    Total_ALLCellMeter_Count, 
+    Total_HighRiseMeter_Count,
+    Total_VillageMeter_Count,
+    Total_CellMeter_Count,
+    Total_LDAMeter_Count,
+    unlocated_meter_Count)
+    
+    elements_dic['ALL LP INTERVAL PUSH SUCCESS RATE'] = AllLPIntervalPushSuccessRate(
+    Total_HighRiseMeter_Count,
+    Total_VillageMeter_Count,
+    Total_CellMeter_Count,
+    Total_LDAMeter_Count,
+    cr_highrise,
+    cr_village,
+    onlycell_meter,
+    LDA_meter)
 
-    latestmetercount = LatestMeterPerformance(cr_list)
-    print(latestmetercount.get_dict_latest())
+    elements_dic['ALL DAYEND PUSH SUCCESS RATE'] = AllDayendPushSuccessRate(
+    Total_HighRiseMeter_Count,
+    cr_highrise,
+    Total_VillageMeter_Count,
+    cr_village,
+    Total_CellMeter_Count,
+    Total_LDAMeter_Count,
+    onlycell_meter,
+    LDA_meter)
 
-    allmetermetercount = AllMetersCount()
-    print(allmetermetercount.get_dict_allmetercount(Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, unlocated_meter_Count))
+    elements_dic['NO LP PUSH METER SUMMARY'] = NoLpPushMeterSummary(
+    Total_AllMeter_Count, 
+    cr_list)
 
-    allllpintervalpushsuccessrate = AllLPIntervalPushSuccessRate(Total_HighRiseMeter_Count, Total_VillageMeter_Count, Total_CellMeter_Count, Total_LDAMeter_Count, cr_highrise, cr_village, onlycell_meter, LDA_meter)
-    print(allllpintervalpushsuccessrate.get_dict_alllpintervalpushsuccessrate())
+    elements_dic['METER STATUS COUNT'] = MeterStatusCount(cr_list)
 
-    allldayendpushsuccessrate = AllDayendPushSuccessRate(Total_HighRiseMeter_Count, cr_highrise, Total_VillageMeter_Count, cr_village, Total_CellMeter_Count, Total_LDAMeter_Count, onlycell_meter, LDA_meter)
-    print(allldayendpushsuccessrate.get_dict_alldayendpushsuccessrate())
+    elements_dic['ALL LP PUSH COUNT PERFORMANCE'] = AllLpPushCountPerformance(
+    cr_list,
+    Total_HighRiseMeter_Count,
+    Total_VillageMeter_Count,
+    unknownbuilding_Count,
+    Total_LDAMeter_Count,
+    cr_highrise,
+    cr_village,
+    Total_CellMeter_Count,
+    onlycell_meter,
+    LDA_meter)
 
-    nolppushmetersummary = NoLpPushMeterSummary(Total_AllMeter_Count, cr_list)
-    print(nolppushmetersummary.get_dict_allnolppushmetersummary())
+    elements_dic['ALL DAYEND PUSH COUNT PERFORMANCE'] = AllDayendPushCountPerformance(
+    cr_list,
+    Total_HighRiseMeter_Count,
+    Total_VillageMeter_Count,
+    unknownbuilding_Count,
+    Total_LDAMeter_Count,
+    cr_highrise,
+    cr_village,
+    Total_CellMeter_Count,
+    onlycell_meter,
+    LDA_meter)
 
-    metersstatuscount = MeterStatusCount(cr_list)
-    print(metersstatuscount.get_dict_meterstatuscount())
+    elements_dic['METER TYPE COMPOSITION RATE'] = MeterTypeCompositionRate(
+    Total_AllMeter_Count,
+    Normal_Meter_Count,
+    SecConfig_Meter_Count,
+    Config_Meter_Count,
+    Discovered_Meter_Count,
+    Failed_Meter_Count,
+    Lost_Meter_Count,
+    Total_ALLCellMeter_Count,
+    Total_HighRiseMeter_Count,
+    Total_VillageMeter_Count,
+    unlocated_meter_Count,
+    Total_LDAMeter_Count,
+    Total_CellMeter_Count)
 
-    alllppushcountperformance = AllLpPushCountPerformance(cr_list, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_LDAMeter_Count, cr_highrise, cr_village, Total_CellMeter_Count, onlycell_meter, LDA_meter)
-    print(alllppushcountperformance.get_dict_alllppushcountperformance())
+    elements_dic['District A'] = DistrictPerformance(cr_list, 'District A')
+    elements_dic['District B'] = DistrictPerformance(cr_list, 'District B')
+    elements_dic['District C'] = DistrictPerformance(cr_list, 'District C')
+    elements_dic['District D'] = DistrictPerformance(cr_list, 'District D')
 
-    alldayendpushcountperformance = AllDayendPushCountPerformance(cr_list, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unknownbuilding_Count, Total_LDAMeter_Count, cr_highrise, cr_village, Total_CellMeter_Count, onlycell_meter, LDA_meter)
-    print(alldayendpushcountperformance.get_dict_alldayendpushcountperformance())
+    new_dict = collections.OrderedDict({})
+    for k, v in elements_dic.items():
+        new_dict = collections.OrderedDict(new_dict, **v.get_dict())
 
-    metercompositionrate = MeterTypeCompositionRate(Total_AllMeter_Count, Normal_Meter_Count, SecConfig_Meter_Count, Config_Meter_Count, Discovered_Meter_Count, Failed_Meter_Count, Lost_Meter_Count, Total_ALLCellMeter_Count, Total_HighRiseMeter_Count, Total_VillageMeter_Count, unlocated_meter_Count, Total_LDAMeter_Count, Total_CellMeter_Count)
-    print(metercompositionrate.get_dict_metertypecompositionrate())
+    firmwareperformance = FirmwarePerformance(cr_list)
+    firmwareperformance = firmwareperformance.output_fw_stats()
+
+    df_performance = ToDataFrame('Performance Result', new_dict)
+    df_performance = df_performance.output_dataframe()
+
+    cr_performance = CollectorPerformance(cr_list)
+    cr_performance = cr_performance.get_collector_statistics()
+
+
+    perftoexcel = WriteToExcel(
+        df_performance, 'Performance Report', 
+        cr_list, 'Analyzed Individual Meters', 
+        'CR Performance', 
+        #'LatestMeters',
+        #'FW Performance',
+        'CR ABC Rank',
+        "Region Performance",
+        "Area Performance",
+        today_date)
+
+    perftoexcel.write_to_excel(
+        df_performance, 'Performance Report', 
+        cr_list, 'Analyzed Individual Meters', 
+        'CR Performance',
+        #'LatestMeters',
+        #'FW Performance',
+        'CR ABC Rank',
+        "Region Performance",
+        "Area Performance")
 
 if __name__ == '__main__':
     main()
